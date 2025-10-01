@@ -22,7 +22,7 @@ class LitigationCrawler:
     def __init__(self, output_dir: str = "litigation_data", delay: float = 5.0):
 
         self.output_dir = output_dir
-        self.delay = delay  # 2-5 second random delay
+        self.delay = delay  
 
         self.session = requests.Session()
         

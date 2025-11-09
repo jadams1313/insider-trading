@@ -1,0 +1,134 @@
+import os
+import time
+import sys
+import warnings
+import numpy as np
+from numpy import newaxis
+from keras.layers import Dense, Activation, Dropout
+from keras.layers import LSTM
+from keras.models import Sequential
+from timesnet import TimesNet
+import torch.nn as nn 
+import torch.nn.functional as F 
+import torch.fft
+sys.path.append(os.path.abspath("C:\Users\User\OpenSourceRepos\Time-Series-Library"))
+from layers.Embed import DataEmbedding
+from layers.Conv_Blocks import Inception_Block_V1   
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' #Hide messy TensorFlow warnings
+warnings.filterwarnings("ignore") #Hide messy Numpy warnings
+
+def load_data(filename, seq_len, normalise_window):
+    f = open(filename, 'rb').read()
+    data = f.decode().split('\n')
+
+    sequence_length = seq_len + 1
+    
+    result = []
+    for index in range(len(data) - sequence_length):
+        result.append(data[index: index + sequence_length])
+    
+    if normalise_window:
+        result = normalise_windows(result)
+
+    result = np.array(result)
+
+    total_samples = result.shape[0]
+    train_end = int(0.7 * total_samples)
+    test_end = int(0.9 * total_samples)  
+    
+    # Split the data
+    train = result[:train_end, :]
+    test = result[train_end:test_end, :]
+    val = result[test_end:, :]
+    
+    # Separate features (X) and targets (y) for each set
+    x_train = train[:, :-1]
+    y_train = train[:, -1]
+    
+    x_test = test[:, :-1]
+    y_test = test[:, -1]
+
+    x_valid = val[:, :-1]
+    y_valid = val[:, -1]
+
+    
+    # Reshape for LSTM input (samples, time steps, features)
+    x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+    x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+    x_valid = np.reshape(x_valid, (x_valid.shape[0], x_valid.shape[1], 1))
+
+
+
+    return [x_train, y_train, x_test, y_test, x_valid, y_valid]
+
+def normalise_windows(window_data):
+    normalised_data = []
+    for window in window_data:
+        normalised_window = [((float(p) / float(window[0])) - 1) for p in window]
+        normalised_data.append(normalised_window)
+    return normalised_data
+"""
+def denormalise_windows(window_data):
+    denormalised_data = []
+    for window in window_data:
+        denormalised_window = [(float(window[0]) * (float(p) + 1)) for p in window]
+        denormalised_data.append(denormalised_window)
+    return denormalised_data
+"""
+
+def build_model(layers):
+    model = Sequential()
+
+    # First LSTM layer with input shape and return sequences
+    model.add(LSTM(units=layers[2], 
+                   input_shape=(layers[0], layers[1]),
+                   return_sequences=True))
+
+
+    # Second LSTM layer
+    model.add(LSTM(
+        units=layers[2],
+        return_sequences=False))
+    model.add(Dropout(0.2))
+
+    # Output layer
+    model.add(Dense(units=layers[3]))
+    model.add(Activation("linear"))
+
+    # Compile the model
+    start = time.time()
+    model.compile(loss="mse", optimizer="rmsprop")
+    print("> Compilation Time : ", time.time() - start)
+
+    return model
+
+
+def predict_point_by_point(model, data):
+    #Predict each timestep given the last sequence of true data, in effect only predicting 1 step ahead each time
+    predicted = model.predict(data)
+    predicted = np.reshape(predicted, (predicted.size,))
+    return predicted
+
+def predict_sequence_full(model, data, window_size):
+    #Shift the window by 1 new prediction each time, re-run predictions on new window
+    curr_frame = data[0]
+    predicted = []
+    for i in range(len(data)):
+        predicted.append(model.predict(curr_frame[newaxis,:,:])[0,0])
+        curr_frame = curr_frame[1:]
+        curr_frame = np.insert(curr_frame, [window_size-1], predicted[-1], axis=0)
+    return predicted
+
+def predict_sequences_multiple(model, data, window_size, prediction_len):
+    #Predict sequence of 50 steps before shifting prediction run forward by 50 steps
+    prediction_seqs = []
+    for i in range(int(len(data)/prediction_len)):
+        curr_frame = data[i*prediction_len]
+        predicted = []
+        for j in range(prediction_len):
+            predicted.append(model.predict(curr_frame[newaxis,:,:])[0,0])
+            curr_frame = curr_frame[1:]
+            curr_frame = np.insert(curr_frame, [window_size-1], predicted[-1], axis=0)
+        prediction_seqs.append(predicted)
+    return prediction_seqs

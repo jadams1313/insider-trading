@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# vs code
+.vscode/
+
+#intellij
+.idea/
 # C extensions
 *.so
 
@@ -35,4 +40,6 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+
+
 

@@ -162,7 +162,8 @@ class LitigationClassifier:
     def evaluate(self, test_dataset):
         """Evaluate model and return metrics"""
         if self.model is None:
-            self.model = AutoModelForSequenceClassification.from_pretrained(self.output_dir / 'model').to(self.device)
+            model_path = os.path.join(self.output_dir, 'model')
+            self.model = AutoModelForSequenceClassification.from_pretrained(model_path).to(self.device)
         
         self.model.eval()
         dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False)
@@ -362,7 +363,7 @@ def main():
     classifier = LitigationClassifier(model_type='finbert')
     df = classifier.load_data('litigation_data\litigation.csv')
     train_ds, val_ds, test_ds, test_df = classifier.prepare_data(df)
-##    classifier.train(train_ds, val_ds, epochs=3)
+    classifier.train(train_ds, val_ds, epochs=3)
     classifier.evaluate(test_ds)
     
     df_classified = classifier.predict(df)

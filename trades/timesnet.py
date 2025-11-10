@@ -7,13 +7,9 @@ from numpy import newaxis
 from keras.layers import Dense, Activation, Dropout
 from keras.layers import LSTM
 from keras.models import Sequential
-from timesnet import TimesNet
 import torch.nn as nn 
 import torch.nn.functional as F 
 import torch.fft
-sys.path.append(os.path.abspath("C:\Users\User\OpenSourceRepos\Time-Series-Library"))
-from layers.Embed import DataEmbedding
-from layers.Conv_Blocks import Inception_Block_V1   
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' #Hide messy TensorFlow warnings
 warnings.filterwarnings("ignore") #Hide messy Numpy warnings
